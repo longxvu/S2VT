@@ -12,7 +12,9 @@ class S2VT(nn.Module):
         self.device = device
         self.decoder_input_size = 2 * self.hidden_size  # output of image encoder + word embedding size
 
-        self.lstm_v2h = nn.LSTM(self.image_feature_size, self.hidden_size, batch_first=True)
+        self.linear_f2f = nn.Linear(self.image_feature_size, self.hidden_size)
+        self.dropout_input = nn.Dropout(0.8)
+        self.lstm_v2h = nn.LSTM(self.hidden_size, self.hidden_size, batch_first=True)
         self.lstm_h2c = nn.LSTM(self.decoder_input_size, self.hidden_size, batch_first=True)
 
         self.embedding = nn.Embedding(self.vocab_size, self.hidden_size)
@@ -21,8 +23,10 @@ class S2VT(nn.Module):
     # caption for training, or index of <BOS> for inference
     def forward(self, video_features, caption=None, word2idx=None):
         # Video features -> hidden layer
+        video_features = self.linear_f2f(video_features)
+        video_features = self.dropout_input(video_features)
         batch_size, num_video_features = video_features.size(0), video_features.size(1)
-        video_padding = torch.zeros((batch_size, self.caption_max_len - 1, self.image_feature_size), device=self.device)
+        video_padding = torch.zeros((batch_size, self.caption_max_len - 1, self.hidden_size), device=self.device)
         padded_video_features = torch.cat([video_features, video_padding], dim=1)
         video_out, video_hidden = self.lstm_v2h(padded_video_features)
 
