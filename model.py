@@ -3,7 +3,7 @@ from torch import nn
 
 
 class S2VT(nn.Module):
-    def __init__(self, image_feature_size=1024, hidden_size=512, vocab_size=1500, caption_max_len=30, device="cpu"):
+    def __init__(self, image_feature_size=1280, hidden_size=512, vocab_size=1500, caption_max_len=30, device="cpu"):
         super(S2VT, self).__init__()
         self.image_feature_size = image_feature_size
         self.caption_max_len = caption_max_len

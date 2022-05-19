@@ -7,6 +7,11 @@ from torch import nn
 from tqdm import tqdm
 from torchvision.transforms import Normalize, ToTensor, Compose
 
+image_transform = Compose([
+    ToTensor(),
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
 
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -23,7 +28,7 @@ class FeatureExtractor(nn.Module):
 
 
 # Given video path, extract video into images, and resize if necessary
-def extract_images(video_path, num_frame_per_video, image_resize=None):
+def extract_images(video_path, num_frame_per_video=80, image_resize=(224, 224)):
     # Read video
     frames = []
     cap = cv.VideoCapture(video_path)
@@ -48,59 +53,62 @@ def extract_images(video_path, num_frame_per_video, image_resize=None):
     return final_frames
 
 
-def extract_all_images(videos_path, output_dir, num_frame_per_video=80, image_size=(224, 224)):
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"Extracting videos into images from {videos_path}")
-
-    for video_path in tqdm(glob.glob(os.path.join(videos_path, "*"))):
-        extracted_frames = extract_images(video_path, num_frame_per_video, image_size)
-
-        _, video_id = os.path.split(video_path)
-        video_id = video_id.split(".")[0]
-        images_output_dir = os.path.join(output_dir, video_id)
-        os.makedirs(images_output_dir, exist_ok=True)
-
-        for idx, frame in enumerate(extracted_frames):
-            cv.imwrite(os.path.join(images_output_dir, f"{idx:03}.png"), frame)
-
-
-def extract_features_images(images, model, transform, device="cpu"):
+def extract_images_features(images, feat_extract_model, transform=image_transform, device="cpu"):
     transformed_images = []
     for image in images:
         transformed_images.append(transform(image))
     transformed_images = torch.stack(transformed_images)  # Now transformed images has size: (80, 3, 224, 224)
     transformed_images = transformed_images.to(device)
-    features = model(transformed_images)
+    with torch.no_grad():
+        features = feat_extract_model(transformed_images)
     return features
 
 
+def extract_all_images_features(videos_path, output_dir, feature_extractor, num_frame_per_video=80,
+                                image_size=(224, 224), save_image=False, device="cpu"):
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Extracting videos into images from {videos_path}")
+
+    for video_path in tqdm(glob.glob(os.path.join(videos_path, "*"))):
+        extracted_frames = extract_images(video_path, num_frame_per_video, image_size)
+        features = extract_images_features(extracted_frames, feature_extractor, device=device)
+        features = features.cpu().numpy()
+
+        _, video_id = os.path.split(video_path)
+        video_id = video_id.split(".")[0]
+        output_path = os.path.join(output_dir, video_id)
+        np.save(f"{output_path}.npy", features)
+
+        if save_image:
+            images_output_dir = os.path.join(output_dir, video_id)
+            os.makedirs(images_output_dir, exist_ok=True)
+
+            for idx, frame in enumerate(extracted_frames):
+                cv.imwrite(os.path.join(images_output_dir, f"{idx:03}.png"), frame)
+
+
+# Use when input dir contains images instead of videos
 def extract_all_features(images_dir, features_output):
     # Create output dir and define transformation from numpy -> pytorch
     os.makedirs(features_output, exist_ok=True)
-    transforms = Compose([
-        ToTensor(),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    # Feature extractor model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    feature_extractor_model = FeatureExtractor()
-    feature_extractor_model.eval()
-    feature_extractor_model.to(device)
 
     # Extract features and saved into numpy images
     with torch.no_grad():
         for video_id in tqdm(os.listdir(images_dir)):
             video_path = os.path.join(images_dir, video_id)
             images = [cv.imread(image) for image in sorted(glob.glob(os.path.join(video_path, "*")))]
-            features = extract_features_images(images, feature_extractor_model, transforms, device)
+            features = extract_images_features(images, feature_extractor_model, device=device)
             features = features.cpu().numpy()
             np.save(os.path.join(features_output, f"{video_id}.npy"), features)
 
 
 if __name__ == "__main__":
-    # Videos -> images
-    extract_all_images("data/YouTubeClips", "data/YoutubeClips_images")
+    # Extractor model
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    feature_extractor_model = FeatureExtractor()
+    feature_extractor_model.eval()
+    feature_extractor_model.to(device)
 
-    # Images -> Features
-    extract_all_features("data/YoutubeClips_images", "data/YoutubeClips_features")
+    # Videos -> images features
+    extract_all_images_features("data/YouTubeClips", "data/YoutubeClips_features",
+                                feature_extractor_model, device=device)

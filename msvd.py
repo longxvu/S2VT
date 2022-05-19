@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 import numpy as np
 import os
 
@@ -9,8 +10,11 @@ class MSVD(Dataset):
         self.features_dir = features_dir
         self.max_vocab_size = max_vocab_size
         self.caption_max_len = caption_max_len
+        self.video_ids = []
 
-        self.video_ids = [video_id.split(".")[0] for video_id in os.listdir(self.features_dir)]
+        if os.path.exists(features_dir):  # If not exists then maybe it's demo
+            self.video_ids = [video_id.split(".")[0] for video_id in os.listdir(self.features_dir)]
+
         captions = self.__load_caption(caption_path)
         self.word2idx, self.idx2word = self.__build_vocab(captions.values())
 
@@ -19,9 +23,6 @@ class MSVD(Dataset):
         for video_id in self.video_ids:
             for label in captions[video_id]:
                 self.video_caption_pairs.append((video_id, label))
-
-        # self.video_caption_pairs = self.video_caption_pairs[:2]
-        # print(self.video_caption_pairs)
 
     def __len__(self):
         return len(self.video_caption_pairs)
@@ -97,9 +98,7 @@ class MSVD(Dataset):
 
 
 if __name__ == "__main__":
-    data = MSVD(features_dir="data/YoutubeClips_features", labels_path="data/AllVideoDescriptions.txt")
+    data = MSVD(features_dir="data/YoutubeClips_features", caption_path="data/AllVideoDescriptions.txt")
 
-    # for features, _ in tqdm(data):
-    #     continue
-
-    print(data[500][2])
+    for features, cap, mask in tqdm(data):
+        continue
