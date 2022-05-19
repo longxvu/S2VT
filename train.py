@@ -17,9 +17,10 @@ CAPTION_MAX_LENGTH = 30
 TRAIN_RATIO = 0.9
 features_dir = "data/YoutubeClips_features"
 caption_file = "data/AllVideoDescriptions.txt"
+split_file = "data/train_split.txt"
 
 # Train & Val subset split
-train_dataset = MSVD(features_dir, caption_file, VOCAB_SIZE, CAPTION_MAX_LENGTH, split="data/train_split.txt")
+train_dataset = MSVD(features_dir, caption_file, VOCAB_SIZE, CAPTION_MAX_LENGTH, split=split_file)
 train_length = int(TRAIN_RATIO * len(train_dataset))
 val_length = len(train_dataset) - train_length
 train_subset, val_subset = random_split(train_dataset, [train_length, val_length],

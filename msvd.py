@@ -32,8 +32,6 @@ class MSVD(Dataset):
             for label in captions[video_id]:
                 self.video_caption_pairs.append((video_id, label))
 
-        self.video_caption_pairs = self.video_caption_pairs[:32]
-
     def __len__(self):
         return len(self.video_caption_pairs)
 
