@@ -1,6 +1,5 @@
 *.tar
-data/YouTubeClips
-data/YoutubeClips_features
+data/YoutubeClips*
 data/AllVideoDescriptions.txt
 *.pth
 .DS_Store

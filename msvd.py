@@ -6,7 +6,7 @@ import os
 
 
 class MSVD(Dataset):
-    def __init__(self, features_dir, caption_path, max_vocab_size=1500, caption_max_len=30, split=None):
+    def __init__(self, features_dir, caption_path, max_vocab_size, caption_max_len, split=None):
         self.features_dir = features_dir
         self.max_vocab_size = max_vocab_size
         self.caption_max_len = caption_max_len
@@ -130,8 +130,7 @@ def split_train_test(dataset, output_dir="data/", test_ratio=0.1):
 
 
 if __name__ == "__main__":
-    data = MSVD(features_dir="data/YoutubeClips_features", caption_path="data/AllVideoDescriptions.txt",
-                split="data/train_split.txt")
+    data = MSVD("data/YoutubeClips_features", "data/AllVideoDescriptions.txt", 2500, 30, split="data/train_split.txt")
 
     # Run if we want to change train/test split
     # split_train_test(data)

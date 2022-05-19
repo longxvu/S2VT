@@ -14,16 +14,24 @@ image_transform = Compose([
 
 
 class FeatureExtractor(nn.Module):
-    def __init__(self):
+    def __init__(self, backbone="resnet"):
+        assert backbone in ["resnet", "mobilenet", "vgg"]
         super(FeatureExtractor, self).__init__()
-        model = torch.hub.load("pytorch/vision:v0.12.0", 'mobilenet_v2', pretrained=True)
-        self.features = model.features
-        self.pool = nn.AvgPool2d(7)
+        if backbone == "mobilenet":
+            model = torch.hub.load("pytorch/vision:v0.12.0", 'mobilenet_v2', pretrained=True)
+            self.features = model.features
+            self.pool = nn.AvgPool2d(7)
+            self.features_out_size = 1280
+        else:
+            model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
+            self.features = torch.nn.Sequential(*(list(model.children())[:-2]))
+            self.pool = model.avgpool
+            self.features_out_size = 2048
 
     def forward(self, x):
         out = self.features(x)
         out = self.pool(out)
-        out = out.view(-1, 1280)
+        out = out.view(-1, self.features_out_size)
         return out
 
 
@@ -105,10 +113,11 @@ def extract_all_features(images_dir, features_output):
 if __name__ == "__main__":
     # Extractor model
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    feature_extractor_model = FeatureExtractor()
+    backbone_model = "resnet"
+    feature_extractor_model = FeatureExtractor(backbone_model)
     feature_extractor_model.eval()
     feature_extractor_model.to(device)
 
     # Videos -> images features
-    extract_all_images_features("data/YouTubeClips", "data/YoutubeClips_features",
+    extract_all_images_features("data/YouTubeClips", f"data/YoutubeClips_features_{backbone_model}",
                                 feature_extractor_model, device=device)
