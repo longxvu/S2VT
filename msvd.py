@@ -6,7 +6,7 @@ import os
 
 
 class MSVD(Dataset):
-    def __init__(self, features_dir, caption_path, max_vocab_size=1500, caption_max_len=30):
+    def __init__(self, features_dir, caption_path, max_vocab_size=1500, caption_max_len=30, split=None):
         self.features_dir = features_dir
         self.max_vocab_size = max_vocab_size
         self.caption_max_len = caption_max_len
@@ -14,6 +14,14 @@ class MSVD(Dataset):
 
         if os.path.exists(features_dir):  # If not exists then maybe it's demo
             self.video_ids = [video_id.split(".")[0] for video_id in os.listdir(self.features_dir)]
+
+        # Only choosing video_id in split
+        if split is not None:
+            with open(split) as file:
+                lines = file.readlines()
+                lines = {line.rstrip() for line in lines if line}
+
+            self.video_ids = [video_id for video_id in self.video_ids if video_id in lines]
 
         captions = self.__load_caption(caption_path)
         self.word2idx, self.idx2word = self.__build_vocab(captions.values())
@@ -23,6 +31,8 @@ class MSVD(Dataset):
         for video_id in self.video_ids:
             for label in captions[video_id]:
                 self.video_caption_pairs.append((video_id, label))
+
+        self.video_caption_pairs = self.video_caption_pairs[:32]
 
     def __len__(self):
         return len(self.video_caption_pairs)
@@ -97,8 +107,36 @@ class MSVD(Dataset):
         return converted_caption, caption_mask
 
 
+def split_train_test(dataset, output_dir="data/", test_ratio=0.1):
+    all_videos = dataset.video_ids
+    test_size = int(len(all_videos) * test_ratio)
+    np.random.seed(2022)
+    test_batch_idx = np.random.choice(len(all_videos), test_size, replace=False)
+    train_ids = []
+    test_ids = []
+    for idx, video_id in enumerate(all_videos):
+        if idx in test_batch_idx:
+            test_ids.append(video_id)
+        else:
+            train_ids.append(video_id)
+
+    with open(os.path.join(output_dir, "train_split.txt"), "wt") as f_out:
+        for video_id in train_ids:
+            f_out.write(video_id)
+            f_out.write("\n")
+
+    with open(os.path.join(output_dir, "test_split.txt"), "wt") as f_out:
+        for video_id in test_ids:
+            f_out.write(video_id)
+            f_out.write("\n")
+
+
 if __name__ == "__main__":
-    data = MSVD(features_dir="data/YoutubeClips_features", caption_path="data/AllVideoDescriptions.txt")
+    data = MSVD(features_dir="data/YoutubeClips_features", caption_path="data/AllVideoDescriptions.txt",
+                split="data/train_split.txt")
+
+    # Run if we want to change train/test split
+    # split_train_test(data)
 
     for features, cap, mask in tqdm(data):
         continue

@@ -67,7 +67,7 @@ def extract_images_features(images, feat_extract_model, transform=image_transfor
 def extract_all_images_features(videos_path, output_dir, feature_extractor, num_frame_per_video=80,
                                 image_size=(224, 224), save_image=False, device="cpu"):
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Extracting videos into images from {videos_path}")
+    print(f"Extracting videos into features from {videos_path}")
 
     for video_path in tqdm(glob.glob(os.path.join(videos_path, "*"))):
         extracted_frames = extract_images(video_path, num_frame_per_video, image_size)

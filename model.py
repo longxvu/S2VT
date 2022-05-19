@@ -38,6 +38,7 @@ class S2VT(nn.Module):
             caption_out, _ = self.lstm_h2c(decoder_input)
             caption_out = caption_out[:, num_video_features:]
             caption_out = self.linear(caption_out)
+            caption_out = torch.permute(caption_out, (0, 2, 1))  # To follow cross entropy loss: (B, C, k...) format
             return caption_out
         else:
             caption_padding = torch.zeros((batch_size, num_video_features, self.hidden_size), device=self.device)

@@ -1,11 +1,10 @@
 import torch
 from model import S2VT
 from msvd import MSVD
-import numpy as np
 from preprocess import FeatureExtractor, extract_images, extract_images_features, image_transform
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "cpu"
 
 # Define feature extractor

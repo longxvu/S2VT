@@ -6,11 +6,13 @@ and change the data path in code accordingly):
     ├── data
         ├── YouTubeClips
         └── AllVideoDescriptions.txt
+        └── train_split.txt
+        └── ...
     ├── train.py
     └── demo.py
     └── ...
 ```
-Package requirements:
+Install necessary package requirements:
 ```shell
 python >= 3.8
 numpy
@@ -23,5 +25,7 @@ Then run:
 ```python
 python preprocess.py    # Create feature files, only need to run once
 python train.py
+# or
+python demo.py
 ```
 

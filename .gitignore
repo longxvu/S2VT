@@ -1,4 +1,7 @@
-data/
+*.tar
+data/YouTubeClips
+data/YoutubeClips_features
+data/AllVideoDescriptions.txt
 *.pth
 .DS_Store
 .idea/
