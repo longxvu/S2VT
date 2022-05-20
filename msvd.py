@@ -6,10 +6,12 @@ import os
 
 
 class MSVD(Dataset):
-    def __init__(self, features_dir, caption_path, max_vocab_size, caption_max_len, split=None):
+    def __init__(self, features_dir, caption_path, max_vocab_size, caption_max_len, split=None, training=True):
         self.features_dir = features_dir
         self.max_vocab_size = max_vocab_size
         self.caption_max_len = caption_max_len
+        # demo uses training = False to get video ID
+        self.training = training
         self.video_ids = []
 
         if os.path.exists(features_dir):  # If not exists then maybe it's demo
@@ -21,28 +23,38 @@ class MSVD(Dataset):
                 lines = file.readlines()
                 lines = {line.rstrip() for line in lines if line}
 
-            self.video_ids = [video_id for video_id in self.video_ids if video_id in lines]
+            if self.training:
+                self.video_ids = [video_id for video_id in self.video_ids if video_id in lines]
 
-        captions = self.__load_caption(caption_path)
-        self.word2idx, self.idx2word = self.__build_vocab(captions.values())
+        self.video_caption_list = self.__load_caption(caption_path)
+        self.video_caption_list = {k: v for k, v in self.video_caption_list.items() if k in self.video_ids}
+        self.word2idx, self.idx2word = self.__build_vocab(self.video_caption_list.values())
 
         # Creating video caption pair for each video and caption
         self.video_caption_pairs = []
         for video_id in self.video_ids:
-            for label in captions[video_id]:
+            for label in self.video_caption_list[video_id]:
                 self.video_caption_pairs.append((video_id, label))
 
     def __len__(self):
-        return len(self.video_caption_pairs)
+        if self.training:
+            return len(self.video_caption_pairs)
+        else:
+            return len(self.video_caption_list)
 
     def __getitem__(self, idx):
-        video_id, caption = self.video_caption_pairs[idx]
-        video_features = np.load(os.path.join(self.features_dir, video_id) + ".npy")
-        video_features = torch.tensor(video_features)
-        caption, caption_mask = self.__prepare_caption(caption)
-        caption, caption_mask = torch.tensor(caption), torch.tensor(caption_mask)
-
-        return video_features, caption, caption_mask
+        if self.training:
+            video_id, caption = self.video_caption_pairs[idx]
+            video_features = np.load(os.path.join(self.features_dir, video_id) + ".npy")
+            video_features = torch.tensor(video_features)
+            caption, caption_mask = self.__prepare_caption(caption)
+            caption, caption_mask = torch.tensor(caption), torch.tensor(caption_mask)
+            return video_features, caption, caption_mask
+        else:
+            video_id = self.video_ids[idx]
+            video_features = np.load(os.path.join(self.features_dir, video_id) + ".npy")
+            video_features = torch.tensor(video_features)
+            return video_features, self.video_caption_list[video_id]
 
     # Load caption from files, remove caption which length > caption_max_len
     def __load_caption(self, labels_path):
@@ -106,28 +118,28 @@ class MSVD(Dataset):
 
 
 # Follows data split from the paper
-def split_train_test(dataset, output_dir="data/", test_size=670):
+def split_train_test(dataset, output_dir="data/", train_size=1200, test_size=670):
     all_videos = sorted(dataset.video_ids)
-    train_val_size = len(all_videos) - test_size
 
-    train_ids = all_videos[:train_val_size]
-    test_ids = all_videos[train_val_size:]
+    train_ids = all_videos[:train_size]
+    val_ids = all_videos[train_size:-test_size]
+    test_ids = all_videos[-test_size:]
     print("Train set length:", len(train_ids))
+    print("Validation set length:", len(val_ids))
     print("Test set length:", len(test_ids))
 
-    with open(os.path.join(output_dir, "train_split.txt"), "wt") as f_out:
-        for video_id in train_ids:
-            f_out.write(video_id)
-            f_out.write("\n")
+    subset_ids = [train_ids, val_ids, test_ids]
+    names = ["train_split.txt", "val_split.txt", "test_split.txt"]
 
-    with open(os.path.join(output_dir, "test_split.txt"), "wt") as f_out:
-        for video_id in test_ids:
-            f_out.write(video_id)
-            f_out.write("\n")
+    for subset_id, name in zip(subset_ids, names):
+        with open(os.path.join(output_dir, name), "wt") as f_out:
+            for video_id in subset_id:
+                f_out.write(video_id)
+                f_out.write("\n")
 
 
 if __name__ == "__main__":
-    data = MSVD("data/YoutubeClips_features", "data/AllVideoDescriptions.txt", 2500, 30)
+    data = MSVD("data/YoutubeClips_features", "data/AllVideoDescriptions.txt", 5000, 30)
 
     # Run if we want to change train/test split
     # split_train_test(data)
