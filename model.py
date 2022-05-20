@@ -12,19 +12,21 @@ class S2VT(nn.Module):
         self.device = device
         self.decoder_input_size = 2 * self.hidden_size  # output of image encoder + word embedding size
 
+        self.relu = nn.ReLU()
         self.linear_f2f = nn.Linear(self.image_feature_size, self.hidden_size)
-        self.dropout_input = nn.Dropout(0.8)
+        self.dropout = nn.Dropout(0.8)
         self.lstm_v2h = nn.LSTM(self.hidden_size, self.hidden_size, batch_first=True)
         self.lstm_h2c = nn.LSTM(self.decoder_input_size, self.hidden_size, batch_first=True)
 
         self.embedding = nn.Embedding(self.vocab_size, self.hidden_size)
-        self.linear = nn.Linear(self.hidden_size, self.vocab_size)
+        self.linear_h2c = nn.Linear(self.hidden_size, self.vocab_size)
 
     # caption for training, or index of <BOS> for inference
     def forward(self, video_features, caption=None, word2idx=None):
         # Video features -> hidden layer
+        video_features = self.relu(video_features)
+        video_features = self.dropout(video_features)
         video_features = self.linear_f2f(video_features)
-        video_features = self.dropout_input(video_features)
         batch_size, num_video_features = video_features.size(0), video_features.size(1)
         video_padding = torch.zeros((batch_size, self.caption_max_len - 1, self.hidden_size), device=self.device)
         padded_video_features = torch.cat([video_features, video_padding], dim=1)
@@ -41,7 +43,8 @@ class S2VT(nn.Module):
             decoder_input = torch.cat([video_out, decoder_input], dim=2)
             caption_out, _ = self.lstm_h2c(decoder_input)
             caption_out = caption_out[:, num_video_features:]
-            caption_out = self.linear(caption_out)
+            caption_out = self.dropout(caption_out)
+            caption_out = self.linear_h2c(caption_out)
             caption_out = torch.permute(caption_out, (0, 2, 1))  # To follow cross entropy loss: (B, C, k...) format
             return caption_out
         else:
@@ -58,7 +61,7 @@ class S2VT(nn.Module):
             next_word, next_hidden = self.lstm_h2c(bos_tensor, caption_hidden)
 
             for idx in range(self.caption_max_len - 2):
-                next_word = self.linear(next_word)
+                next_word = self.linear_h2c(next_word)
                 word_out = next_word.max(dim=2)[1]
                 results = torch.hstack([results, word_out])
                 word_out = self.embedding(word_out)

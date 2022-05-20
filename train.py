@@ -25,8 +25,8 @@ s2vt_model = S2VT(config.IMAGE_FEATURE_SIZE, config.HIDDEN_SIZE, config.VOCAB_SI
 s2vt_model.to(device)
 
 criterion = nn.CrossEntropyLoss(reduction="none")
-optimizer = torch.optim.SGD(s2vt_model.parameters(), lr=0.001, momentum=0.9)
-# optimizer = torch.optim.Adam(s2vt_model.parameters())
+# optimizer = torch.optim.SGD(s2vt_model.parameters(), lr=0.001, momentum=0.9)
+optimizer = torch.optim.Adam(s2vt_model.parameters())
 loss_so_far = np.inf
 
 for epoch in range(config.NUM_EPOCH):

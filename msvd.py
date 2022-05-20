@@ -105,18 +105,15 @@ class MSVD(Dataset):
         return converted_caption, caption_mask
 
 
-def split_train_test(dataset, output_dir="data/", test_ratio=0.1):
-    all_videos = dataset.video_ids
-    test_size = int(len(all_videos) * test_ratio)
-    np.random.seed(2022)
-    test_batch_idx = np.random.choice(len(all_videos), test_size, replace=False)
-    train_ids = []
-    test_ids = []
-    for idx, video_id in enumerate(all_videos):
-        if idx in test_batch_idx:
-            test_ids.append(video_id)
-        else:
-            train_ids.append(video_id)
+# Follows data split from the paper
+def split_train_test(dataset, output_dir="data/", test_size=670):
+    all_videos = sorted(dataset.video_ids)
+    train_val_size = len(all_videos) - test_size
+
+    train_ids = all_videos[:train_val_size]
+    test_ids = all_videos[train_val_size:]
+    print("Train set length:", len(train_ids))
+    print("Test set length:", len(test_ids))
 
     with open(os.path.join(output_dir, "train_split.txt"), "wt") as f_out:
         for video_id in train_ids:
@@ -130,7 +127,7 @@ def split_train_test(dataset, output_dir="data/", test_ratio=0.1):
 
 
 if __name__ == "__main__":
-    data = MSVD("data/YoutubeClips_features", "data/AllVideoDescriptions.txt", 2500, 30, split="data/train_split.txt")
+    data = MSVD("data/YoutubeClips_features", "data/AllVideoDescriptions.txt", 2500, 30)
 
     # Run if we want to change train/test split
     # split_train_test(data)
