@@ -6,41 +6,49 @@ import os
 
 
 class MSVD(Dataset):
-    def __init__(self, features_dir, caption_path, max_vocab_size, caption_max_len, split=None, training=True):
+    def __init__(self, features_dir, caption_path, caption_max_len, vocab, split=None, training=True):
         self.features_dir = features_dir
-        self.max_vocab_size = max_vocab_size
         self.caption_max_len = caption_max_len
         # demo uses training = False to get video ID
         self.training = training
         self.video_ids = []
-
         if os.path.exists(features_dir):  # If not exists then maybe it's demo
             self.video_ids = [video_id.split(".")[0] for video_id in os.listdir(self.features_dir)]
 
+        self.vocab = vocab
         # Only choosing video_id in split
         if split is not None:
             with open(split) as file:
                 lines = file.readlines()
                 lines = {line.rstrip() for line in lines if line}
 
-            if self.training:
-                self.video_ids = [video_id for video_id in self.video_ids if video_id in lines]
+            self.video_ids = [video_id for video_id in self.video_ids if video_id in lines]
 
-        self.video_caption_list = self.__load_caption(caption_path)
-        self.video_caption_list = {k: v for k, v in self.video_caption_list.items() if k in self.video_ids}
-        self.word2idx, self.idx2word = self.__build_vocab(self.video_caption_list.values())
+        print("Building caption data")
+        self.video_caption_list = Vocab.load_caption(caption_path, caption_max_len)
+        self.caption_max_len += 2  # Accounting for <BOS> and <EOS>
 
         # Creating video caption pair for each video and caption
         self.video_caption_pairs = []
         for video_id in self.video_ids:
             for label in self.video_caption_list[video_id]:
                 self.video_caption_pairs.append((video_id, label))
+                if self.training:
+                    break  # One caption per video
+
+        # Debugging stuff
+        # np.random.seed(2022)
+        # idx = np.random.choice(range(len(self.video_caption_pairs)), 64, replace=False)
+        # self.video_caption_pairs = [self.video_caption_pairs[ids] for ids in idx]
+        # print(self.video_caption_pairs)
+        # self.video_ids = list({pair[0] for pair in self.video_caption_pairs})[:10]
+        # print(self.video_ids)
 
     def __len__(self):
         if self.training:
             return len(self.video_caption_pairs)
         else:
-            return len(self.video_caption_list)
+            return len(self.video_ids)
 
     def __getitem__(self, idx):
         if self.training:
@@ -56,10 +64,42 @@ class MSVD(Dataset):
             video_features = torch.tensor(video_features)
             return video_features, self.video_caption_list[video_id]
 
+    # Prepare caption for training
+    def __prepare_caption(self, caption):
+        converted_caption = []
+        # Pad caption to have desired length
+        caption_length = len(caption)
+        # Nice bug
+        padded_caption = caption + ["<EOS>"] * (self.caption_max_len - caption_length)
+        for word in padded_caption:
+            if word in self.vocab.word2idx:
+                converted_caption.append(self.vocab.word2idx[word])
+            else:
+                converted_caption.append(self.vocab.word2idx["<UNK>"])
+
+        # mask to signal our model to stop learning the padded EOS token
+        caption_mask = [1] * caption_length + [0] * (self.caption_max_len - caption_length)
+        return converted_caption, caption_mask
+
+
+# For all subset use training vocab only
+class Vocab:
+    def __init__(self, caption_file, max_vocab_size, caption_max_len, vocab_file="data/train_split.txt"):
+        self.max_vocab_size = max_vocab_size
+
+        with open(vocab_file) as file:
+            lines = file.readlines()
+            # videos id to extract vocab from
+            self.vocab_videos_id = {line.rstrip() for line in lines if line}
+
+        self._video_caption_list = self.load_caption(caption_file, caption_max_len)
+        self._video_caption_list = {k: v for k, v in self._video_caption_list.items() if k in self.vocab_videos_id}
+        self.word2idx, self.idx2word = self.__build_vocab(self._video_caption_list.values())
+
     # Load caption from files, remove caption which length > caption_max_len
-    def __load_caption(self, labels_path):
+    @staticmethod
+    def load_caption(labels_path, caption_max_len):
         captions = {}
-        print("Loading captions")
         with open(labels_path) as label_file:
             for line in label_file:
                 if line.startswith("#") or len(line.strip()) == 0:
@@ -67,17 +107,15 @@ class MSVD(Dataset):
                 line = line.split()
                 video_id, description = line[0], line[1:]
                 # Some captions with length 30 just doesn't make sense, so we remove it from the caption set
-                if len(description) > self.caption_max_len:
+                if len(description) > caption_max_len:
                     continue
                 if video_id not in captions:
                     captions[video_id] = []
-                captions[video_id].append(["<BOS>"] + description + ["<EOS>"])
-        self.caption_max_len += 2  # to account for <BOS> and <EOS> token
+                captions[video_id].append(["<BOS>"] + [token.lower() for token in description] + ["<EOS>"])
         return captions
 
     # Create word count to get vocab with predefined max size. Create word <-> idx mapping
     def __build_vocab(self, caption_list):
-        print("Building vocabulary from captions")
         word2idx = {}
         idx2word = {}
         word_count = {}
@@ -92,29 +130,13 @@ class MSVD(Dataset):
         word_count = {word: count for word, count in
                       sorted(word_count.items(), key=lambda item: item[1], reverse=True)}
         # Now we assume max_vocab_size is always less than vocab size
-        for idx, word in enumerate(list(word_count.keys())[:self.max_vocab_size-1]):
+        for idx, word in enumerate(list(word_count.keys())[:self.max_vocab_size - 1]):
             word2idx[word] = idx
             idx2word[idx] = word
         word2idx["<UNK>"] = self.max_vocab_size - 1
         idx2word[self.max_vocab_size - 1] = "<UNK>"
 
         return word2idx, idx2word
-
-    # Prepare caption for training
-    def __prepare_caption(self, caption):
-        converted_caption = []
-        # Pad caption to have desired length
-        caption_length = len(caption)
-        caption += ["<EOS>"] * (self.caption_max_len - caption_length)
-        for word in caption:
-            if word in self.word2idx:
-                converted_caption.append(self.word2idx[word])
-            else:
-                converted_caption.append(self.word2idx["<UNK>"])
-
-        # mask to signal our model to stop learning the padded EOS token
-        caption_mask = [1] * caption_length + [0] * (self.caption_max_len - caption_length)
-        return converted_caption, caption_mask
 
 
 # Follows data split from the paper

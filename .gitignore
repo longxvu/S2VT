@@ -5,3 +5,4 @@ data/AllVideoDescriptions.txt
 .DS_Store
 .idea/
 __pycache__/
+eval_result.txt

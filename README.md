@@ -5,9 +5,13 @@ and change the data path in code accordingly):
 └── sv2t
     ├── data
         ├── YouTubeClips
+        ├── YouTubeClips_features_resnet
         └── AllVideoDescriptions.txt
         └── train_split.txt
         └── ...
+    ├── runs
+        ├── last_resnet_300.pth
+        ├── last_resnet_300.pth
     ├── train.py
     └── demo.py
     └── ...
@@ -27,5 +31,7 @@ python preprocess.py    # Create feature files, only need to run once
 python train.py
 # or
 python demo.py
+# evaluation on test_set
+python eval.py
 ```
 
