@@ -1,6 +1,5 @@
 *.tar
 data/YoutubeClips*
-data/AllVideoDescriptions.txt
 *.pth
 .DS_Store
 .idea/
